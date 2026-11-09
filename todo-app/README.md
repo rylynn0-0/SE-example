@@ -30,7 +30,7 @@
 
 > 想按「技术 → 代码片段」逐条对照阅读，请看 **[docs/技术栈代码对照.md](docs/技术栈代码对照.md)**。
 > 想查每个接口的请求参数和返回结构，请看 **[docs/API接口文档.md](docs/API接口文档.md)**。
-> 想按「前端 → 后端 → 数据库 → 两处耦合 → 必要技术」系统入门，请看 **[docs/tutorials/00-开始这里.md](docs/tutorials/00-开始这里.md)**。共 10 篇：总览 + 六章概念 + 三份模板手册（[07 前端](docs/tutorials/07-前端模板.md)、[08 后端](docs/tutorials/08-后端文件模板.md)、[09 数据库](docs/tutorials/09-数据库模板.md)），模板与语法写在一起。
+> 想按「定位 → 耦合 → 操作」的路径入门，请看 **[docs/tutorials/00-开始这里.md](docs/tutorials/00-开始这里.md)**。共 10 篇：总览 + 定位（01–03）+ 耦合（04–05）+ 模板（[06 前端](docs/tutorials/06-前端模板.md)、[07 后端](docs/tutorials/07-后端模板.md)、[08 数据库](docs/tutorials/08-数据库模板.md)）+ [09 部署运行](docs/tutorials/09-必要技术.md)，模板与语法写在一起。
 
 ---
 
@@ -87,7 +87,7 @@
 
 ```
 todo-app/
-├── docker-compose.yml              # 四容器编排（见 docs/tutorials/06-必要技术.md 第四节）
+├── docker-compose.yml              # 四容器编排（见 docs/tutorials/09-必要技术.md 第四节）
 ├── README.md
 ├── docs/
 │   ├── 技术栈代码对照.md            # 每项技术 → 对应代码片段
@@ -99,10 +99,10 @@ todo-app/
 │       ├── 03-数据库.md            # MySQL / Redis
 │       ├── 04-前端与后端耦合.md     # 五份契约 / 代理 / 联调
 │       ├── 05-后端与数据库耦合.md   # MyBatis-Plus / 事务 / 缓存
-│       ├── 06-必要技术.md           # Knife4j / Nginx / Docker
-│       ├── 07-前端模板.md           # 文件与页面区块拆解 + Vue/JS 语法
-│       ├── 08-后端文件模板.md       # 文件与接口/方法拆解 + Java/Spring
-│       └── 09-数据库模板.md         # 建表脚本逐块拆解 + SQL/Redis
+│       ├── 06-前端模板.md           # 文件与页面区块拆解 + Vue/JS 语法
+│       ├── 07-后端模板.md           # 文件与接口/方法拆解 + Java/Spring
+│       ├── 08-数据库模板.md         # 建表脚本逐块拆解 + SQL/Redis
+│       └── 09-必要技术.md           # Knife4j / Nginx / Docker
 ├── backend/                        # Spring Boot 后端
 │   ├── pom.xml                     # 依赖：web / mybatis-plus / mysql / redis / knife4j / lombok
 │   ├── settings.xml                # Maven 阿里云镜像（只在 Docker 构建时用 -s 指定）
