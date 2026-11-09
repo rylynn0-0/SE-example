@@ -2,3 +2,6 @@ target/
 .idea/
 *.iml
 .git/
+
+# 本地 Maven 缓存（沙箱环境下放在工作区内，不应进入构建上下文）
+.m2-cache/
