@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        继承 Spring Boot 官方父工程。
+        作用：统一管理所有依赖的版本号、Java 编译参数、打包插件，
+        所以我们引入 spring-boot-starter-web 时并不需要写版本号。
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>todo-backend</artifactId>
+    <version>1.0.0</version>
+    <name>todo-backend</name>
+    <description>待办清单最简全栈示例 · Spring Boot + MyBatis-Plus + MySQL + Redis + Knife4j</description>
+
+    <properties>
+        <!-- Spring Boot 3.x 要求 JDK 17 及以上 -->
+        <java.version>17</java.version>
+        <mybatis-plus.version>3.5.7</mybatis-plus.version>
+        <knife4j.version>4.5.0</knife4j.version>
+    </properties>
+
+    <dependencies>
+        <!--
+            【Spring Boot Web】
+            引入 Spring MVC + 内嵌 Tomcat + Jackson（JSON 序列化）。
+            这是所有 REST 接口能被浏览器访问的基础。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!--
+            【MyBatis-Plus】
+            注意 artifactId 是 mybatis-plus-spring-boot3-starter，
+            这是专门适配 Spring Boot 3（Jakarta EE 命名空间）的版本。
+            它提供 BaseMapper（免写 XML 的单表 CRUD）和 IService。
+        -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
+        <!--
+            【MySQL 驱动】
+            只在运行时需要（编译期只面向 JDBC 接口），所以 scope 设为 runtime。
+        -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!--
+            【Redis】
+            提供 RedisTemplate / StringRedisTemplate，
+            本示例用它实现 Cache-Aside 缓存（统计数字缓存 60 秒）。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!--
+            【Knife4j】
+            基于 springdoc-openapi（OpenAPI 3 规范）的增强接口文档 UI，
+            启动后访问 http://localhost:8080/doc.html 即可在线调试接口。
+            jakarta 后缀表示适配 Spring Boot 3。
+        -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+            <version>${knife4j.version}</version>
+        </dependency>
+
+        <!--
+            【Lombok】
+            编译期生成 getter/setter/构造器/日志对象，减少样板代码。
+            optional=true 表示不向下传递给依赖本项目的其他工程。
+        -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+                Spring Boot 打包插件：
+                把项目和所有依赖打成一个可执行 jar（内含 Tomcat），
+                因此 Docker 镜像里只需要 java -jar 即可启动，无需安装 Tomcat。
+            -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <!-- Lombok 只在编译期有用，不打进最终 jar -->
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,78 @@
+# ============================================================
+# Spring Boot 主配置文件
+# 所有 ${XXX:默认值} 的写法都表示：优先读环境变量 XXX，读不到则用默认值。
+# docker-compose 里就是通过注入环境变量（MYSQL_HOST=mysql 等）
+# 让同一份 jar 包在本地和容器里都能跑起来，而不需要改代码。
+# ============================================================
+server:
+  port: 8080
+
+spring:
+  application:
+    name: todo-backend
+
+  # ---------- MySQL 数据源 ----------
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DB:todo_db}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:todo}
+    password: ${MYSQL_PASSWORD:todo123456}
+
+  # ---------- Redis 缓存 ----------
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      timeout: 3s
+
+  # ---------- JSON 序列化 ----------
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+# ============================================================
+# MyBatis-Plus 配置
+# ============================================================
+mybatis-plus:
+  configuration:
+    # 开启驼峰映射：数据库的 due_date 自动对应 Java 的 dueDate
+    map-underscore-to-camel-case: true
+    # 把执行的 SQL 打印到控制台，方便学习和排查问题；生产环境应关掉
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    # 关闭启动时的 MyBatis-Plus 版本横幅
+    banner: false
+    db-config:
+      # 主键策略：数据库自增
+      id-type: auto
+      # 逻辑删除：指定标记字段名与「已删/未删」的取值
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# ============================================================
+# 接口文档配置
+# springdoc 负责生成 OpenAPI 3 规范的 JSON
+# knife4j 负责把该 JSON 渲染成中文可视化页面 /doc.html
+# ============================================================
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+# ============================================================
+# 日志级别
+# ============================================================
+logging:
+  level:
+    root: info
+    # 打开本项目 debug 日志，可以看到缓存命中/回源的过程
+    com.example.todo: debug

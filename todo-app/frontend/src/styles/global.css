@@ -1,0 +1,27 @@
+/* ============================================================
+   全局基础样式
+   组件内部样式写在各自的 <style scoped> 里，
+   这里只放「整个页面通用」的规则。
+   ============================================================ */
+
+/* 让元素的 width 包含 padding 和 border，尺寸计算更符合直觉 */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  /* 中英文混排时优先使用系统中文字体 */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  /* 浅灰背景，让白色卡片浮起来，层次更清楚 */
+  background-color: #f5f7fa;
+  color: #303133;
+  -webkit-font-smoothing: antialiased;
+}

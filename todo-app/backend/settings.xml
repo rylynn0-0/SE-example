@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                              https://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+    <!--
+        ============================================================
+        Maven 镜像配置（阿里云公共仓库）
+
+        用法：仅 Docker 构建时通过 `mvn -s settings.xml ...` 显式指定，
+              不影响宿主机 ~/.m2/settings.xml 里的个人配置。
+
+        为什么要它？
+          Maven 默认从 https://repo.maven.apache.org/maven2 下载依赖，
+          国内网络下经常慢到几十 KB/s 甚至超时。
+          阿里云公共仓库是 Maven Central 的完整代理，国内下载通常快 10 倍以上。
+
+        mirrorOf 取值说明：
+          *
+ —— 拦截所有仓库请求（含插件仓库），本项目只用 Maven Central，够用且最省心
+          central —— 只替换中央仓库
+        ============================================================
+    -->
+    <mirrors>
+        <mirror>
+            <!-- id 任意，仅作标识 -->
+            <id>aliyunmaven</id>
+            <!-- * 表示所有仓库都走这个镜像 -->
+            <mirrorOf>*</mirrorOf>
+            <name>阿里云公共仓库</name>
+            <url>https://maven.aliyun.com/repository/public</url>
+        </mirror>
+    </mirrors>
+
+    <!--
+        显式声明仓库，保证即使 mirror 未生效也能走阿里云，
+        属于双保险（real 项目里常见写法）。
+    -->
+    <profiles>
+        <profile>
+            <id>aliyun</id>
+
+            <!-- 依赖包仓库 -->
+            <repositories>
+                <repository>
+                    <id>aliyun-public</id>
+                    <url>https://maven.aliyun.com/repository/public</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+
+            <!-- Maven 插件仓库（编译、打包插件也走镜像，否则还是会去中央仓库） -->
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>aliyun-plugin</id>
+                    <url>https://maven.aliyun.com/repository/public</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+    </profiles>
+
+    <!-- 默认激活上面的 profile -->
+    <activeProfiles>
+        <activeProfile>aliyun</activeProfile>
+    </activeProfiles>
+</settings>

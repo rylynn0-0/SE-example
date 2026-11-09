@@ -1,0 +1,130 @@
+# ============================================================
+# 待办清单示例 · 四容器编排
+#
+#   浏览器
+#     │ http://localhost:8081
+#     ▼
+#   frontend (Nginx)  ──/api──▶  backend (Spring Boot)
+#                                    ├──▶ mysql  (持久化)
+#                                    └──▶ redis  (缓存)
+#
+# 启动：docker compose up -d --build
+# 停止：docker compose down          （保留数据）
+# 重置：docker compose down -v       （连数据卷一起删，init.sql 会重新执行）
+# ============================================================
+
+name: todo-app
+
+services:
+  # ------------------------------------------------------------
+  # MySQL：业务数据持久化
+  # 首次启动时会自动执行挂载进 /docker-entrypoint-initdb.d/ 的 init.sql，
+  # 完成建库、建表和插入 8 条演示数据。
+  # ------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: todo-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456   # root 密码，仅本地演示使用
+      MYSQL_DATABASE: todo_db           # 自动创建该库
+      MYSQL_USER: todo                  # 自动创建该业务账号
+      MYSQL_PASSWORD: todo123456
+      TZ: Asia/Shanghai
+      # 让容器内的 mysql 客户端按 UTF-8 解析输入。
+      # 不设置时 LANG 为空，客户端默认 latin1，执行 init.sql 会把中文写成乱码。
+      LANG: C.UTF-8
+    ports:
+      - "3306:3306"                     # 宿主机可以用 Navicat 等工具直连
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --default-time-zone=+08:00
+    volumes:
+      # 数据卷：容器删除后数据仍在
+      - mysql-data:/var/lib/mysql
+      # 初始化脚本：只在数据目录为空（首次启动）时执行一次
+      - ./backend/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # 用业务账号 ping，能真正验证「库已就绪」，而不只是进程起来了
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-utodo", "-ptodo123456"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 25s                 # 给 MySQL 首次初始化留出时间
+    networks:
+      - todo-net
+
+  # ------------------------------------------------------------
+  # Redis：缓存层
+  # appendonly yes 开启 AOF 持久化，容器重启后缓存数据不丢（演示体验更好）
+  # ------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: todo-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - todo-net
+
+  # ------------------------------------------------------------
+  # 后端：Spring Boot + MyBatis-Plus
+  # 通过环境变量把容器内的 mysql / redis 地址注入 application.yml，
+  # 因此同一份 jar 包在本地和容器里都能运行。
+  # ------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+    container_name: todo-backend
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DB: todo_db
+      MYSQL_USER: todo
+      MYSQL_PASSWORD: todo123456
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:8080"                     # 直接访问 http://localhost:8080/doc.html
+    depends_on:
+      # 等 MySQL / Redis 健康检查通过再启动，避免后端启动时连不上库而退出
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - todo-net
+
+  # ------------------------------------------------------------
+  # 前端：Nginx 托管 Vue 构建产物，并把 /api 反代给后端
+  # ------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+    container_name: todo-frontend
+    restart: unless-stopped
+    ports:
+      - "8081:80"                       # 浏览器访问 http://localhost:8081
+    depends_on:
+      - backend
+    networks:
+      - todo-net
+
+volumes:
+  mysql-data:
+  redis-data:
+
+networks:
+  todo-net:
+    driver: bridge
