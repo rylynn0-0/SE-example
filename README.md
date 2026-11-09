@@ -107,7 +107,7 @@ docker compose down -v   # 停止并删数据卷（init.sql 会重新执行）
   docker run --rm dns-test
   ```
 
-- **`.research/`**：本地工作区的研究记录备份（JSON），随仓库保留，但**与示例代码无关**，可以忽略或自行删除。
+- **`.research/`**：本地工作区的研究记录备份（JSON），属于本机工具数据，**已由 `.gitignore` 忽略**，与示例代码无关；不影响克隆与构建。
 
 ---
 
