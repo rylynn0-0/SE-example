@@ -30,7 +30,8 @@
 
 > 想按「技术 → 代码片段」逐条对照阅读，请看 **[docs/技术栈代码对照.md](docs/技术栈代码对照.md)**。
 > 想查每个接口的请求参数和返回结构，请看 **[docs/API接口文档.md](docs/API接口文档.md)**。
-> 想按「定位 → 耦合 → 操作」的路径入门，请看 **[docs/tutorials/00-开始这里.md](docs/tutorials/00-开始这里.md)**。共 10 篇：总览 + 定位（01–03）+ 耦合（04–05）+ 模板（[06 前端](docs/tutorials/06-前端模板.md)、[07 后端](docs/tutorials/07-后端模板.md)、[08 数据库](docs/tutorials/08-数据库模板.md)）+ [09 部署运行](docs/tutorials/09-必要技术.md)，模板与语法写在一起。
+> 想按「定位 → 耦合 → 操作」的路径入门，请看 **[docs/tutorials/00-开始这里.md](docs/tutorials/00-开始这里.md)**。共 15 篇：总览 + 定位（01–03）+ 耦合（04–05）+ 模板（[06 前端](docs/tutorials/06-前端模板.md)、[07 后端](docs/tutorials/07-后端模板.md)、[08 数据库](docs/tutorials/08-数据库模板.md)）+ [09 部署运行](docs/tutorials/09-必要技术.md) + 增删改查专题（[10 总览](docs/tutorials/10-增删改查总览.md)、[11 查](docs/tutorials/11-查询链路.md)、[12 增](docs/tutorials/12-新增链路.md)、[13 改](docs/tutorials/13-修改链路.md)、[14 删](docs/tutorials/14-删除链路.md)），模板与语法写在一起。
+> 想按「用户点击 → 转发后端 → 操作数据库 → 回显前端」走完增删改查四条链路，先看 **[10 总览](docs/tutorials/10-增删改查总览.md)**，再按需读 [11 查](docs/tutorials/11-查询链路.md) / [12 增](docs/tutorials/12-新增链路.md) / [13 改](docs/tutorials/13-修改链路.md) / [14 删](docs/tutorials/14-删除链路.md)。
 
 ---
 
@@ -92,7 +93,7 @@ todo-app/
 ├── docs/
 │   ├── 技术栈代码对照.md            # 每项技术 → 对应代码片段
 │   ├── API接口文档.md               # 接口清单、参数、返回示例、错误码
-│   └── tutorials/                  # 分层教程（总览 + 六章 + 三份模板）
+│   └── tutorials/                  # 分层教程（总览 + 分层 + 模板 + 增删改查专题）
 │       ├── 00-开始这里.md           # 建议从这里开始
 │       ├── 01-前端.md              # Vue3 / Element Plus / Vite
 │       ├── 02-后端.md              # Spring Boot / 分层 / 统一响应
@@ -102,7 +103,12 @@ todo-app/
 │       ├── 06-前端模板.md           # 文件与页面区块拆解 + Vue/JS 语法
 │       ├── 07-后端模板.md           # 文件与接口/方法拆解 + Java/Spring
 │       ├── 08-数据库模板.md         # 建表脚本逐块拆解 + SQL/Redis
-│       └── 09-必要技术.md           # Knife4j / Nginx / Docker
+│       ├── 09-必要技术.md           # Knife4j / Nginx / Docker
+│       ├── 10-增删改查总览.md       # 公共机制 + 四操作速查 + 验证/排错
+│       ├── 11-查询链路.md           # 查询/搜索/分页 → SQL → 表格回显
+│       ├── 12-新增链路.md           # 弹窗/表单 → INSERT → 新行出现
+│       ├── 13-修改链路.md           # 编辑 PUT + 状态开关 PATCH
+│       └── 14-删除链路.md           # 确认框 → 逻辑删除 → 行消失
 ├── backend/                        # Spring Boot 后端
 │   ├── pom.xml                     # 依赖：web / mybatis-plus / mysql / redis / knife4j / lombok
 │   ├── settings.xml                # Maven 阿里云镜像（只在 Docker 构建时用 -s 指定）
