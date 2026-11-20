@@ -49,7 +49,8 @@
 | 任务不存在 | 200 | 404 | 由 `Result.fail(404, ...)` 返回 |
 | 未捕获的异常（如数据库断开） | 500 | — | 由 Spring Boot 默认错误处理返回 `{timestamp,status,error,path}`，**不是**上面的三段式结构 |
 
-> 前端的 `axios` 响应拦截器（`api/request.js`）正是基于 `body.code === 200` 来判断成功的。
+> 前端的 `axios` 响应拦截器（`api/request.js`）正是基于 `body.code === 200` 来判断成功的；
+> 移动端的 `uni.request` 封装（`mobile/api/request.uts`）使用同一套判断。
 > 生产项目通常会再加一个全局异常处理器（`@RestControllerAdvice`），把第 4 种情况也统一成三段式结构；本示例为保持「最简」未引入。
 
 ### 1.3 字段字典
@@ -91,11 +92,12 @@
 | # | 方法 | 路径 | 说明 | 是否写操作 |
 |---|---|---|---|---|
 | 1 | GET | `/api/tasks` | 分页查询任务列表 | 否 |
-| 2 | GET | `/api/tasks/stats` | 任务统计（Redis 缓存） | 否 |
-| 3 | POST | `/api/tasks` | 新增任务 | 是（清缓存） |
-| 4 | PUT | `/api/tasks/{id}` | 更新任务 | 是（清缓存） |
-| 5 | PATCH | `/api/tasks/{id}/finished` | 切换完成状态 | 是（清缓存） |
-| 6 | DELETE | `/api/tasks/{id}` | 逻辑删除任务 | 是（清缓存） |
+| 2 | GET | `/api/tasks/{id}` | 查询单条任务（移动端编辑页） | 否 |
+| 3 | GET | `/api/tasks/stats` | 任务统计（Redis 缓存） | 否 |
+| 4 | POST | `/api/tasks` | 新增任务 | 是（清缓存） |
+| 5 | PUT | `/api/tasks/{id}` | 更新任务 | 是（清缓存） |
+| 6 | PATCH | `/api/tasks/{id}/finished` | 切换完成状态 | 是（清缓存） |
+| 7 | DELETE | `/api/tasks/{id}` | 逻辑删除任务 | 是（清缓存） |
 
 ---
 
@@ -554,3 +556,61 @@ curl -X DELETE "http://localhost:8080/api/tasks/9"
 ```
 
 第 2、3、5 步的结果差异，就是 Redis 缓存在起作用的直接证据。
+
+---
+
+## 十二、GET /api/tasks/{id} —— 查询单条任务（移动端新增）
+
+> 这是为 uni-app x 编辑页新增的接口，见
+> [15 移动端](tutorials/15-移动端.md)。原有 Web 端不使用它，不影响旧功能。
+
+### 12.1 路径参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `id` | long | 是 | 任务主键 |
+
+### 12.2 请求示例
+
+```bash
+curl "http://localhost:8080/api/tasks/1"
+```
+
+### 12.3 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "成功",
+  "data": {
+    "id": 1,
+    "title": "完成软工课程设计开题报告",
+    "description": "整理论文选题、技术选型与进度安排",
+    "priority": 3,
+    "finished": 0,
+    "dueDate": "2026-11-10",
+    "createTime": "2026-11-08 19:00:00",
+    "updateTime": "2026-11-08 19:30:00"
+  }
+}
+```
+
+### 12.4 失败响应
+
+任务不存在或已被逻辑删除：
+
+```json
+{
+  "code": 404,
+  "message": "任务不存在",
+  "data": null
+}
+```
+
+### 12.5 与分页接口的区别
+
+| | `GET /api/tasks` | `GET /api/tasks/{id}` |
+|---|---|---|
+| 用途 | 列表、搜索、筛选 | 编辑页回填 |
+| 返回 | `records` + `total` 分页结构 | 单条 Task |
+| 是否新增 | 原有接口 | 移动端新增 |

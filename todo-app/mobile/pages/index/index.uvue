@@ -1,0 +1,1240 @@
+<template>
+  <view class="page">
+    <!-- 整页可上下拖动：scroll-view 必须拿到明确高度 -->
+    <scroll-view class="page-scroll" :scroll-y="true">
+    <!-- 顶部白色页头，与网页端保持一致 -->
+    <view class="topbar" :style="{ paddingTop: statusBarHeight + 22 + 'px' }">
+      <view class="hero-top">
+        <view class="brand">
+          <view class="brand-logo">
+            <text class="brand-logo-text">✓</text>
+          </view>
+          <view class="brand-copy">
+            <text class="brand-name">待办清单</text>
+            <text class="brand-sub">Spring Boot + MySQL + Redis</text>
+          </view>
+        </view>
+        <view class="icon-button" hover-class="icon-button-hover" @click="openSettings">
+          <text class="icon-button-text">⚙</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 浅灰内容区：标题、统计与缓存状态 -->
+    <view class="hero">
+      <view class="hero-title-wrap">
+        <text class="hero-eyebrow">任务总览</text>
+        <text class="hero-title">把要做的事，一件件完成</text>
+        <text class="hero-desc">数据来自后端，统计缓存来自 Redis</text>
+      </view>
+
+      <!-- 统计卡片：数字全部来自后端，不在前端自行计算 -->
+      <view class="stats-row">
+        <view class="stat-card">
+          <text class="stat-label">全部</text>
+          <text class="stat-value">{{ stats.total }}</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-label">进行中</text>
+          <text class="stat-value stat-amber">{{ stats.unfinished }}</text>
+        </view>
+        <view class="stat-card">
+          <text class="stat-label">已完成</text>
+          <text class="stat-value stat-green">{{ stats.finished }}</text>
+        </view>
+      </view>
+
+      <!-- Redis 缓存状态：命中 / 回源直接显示，方便演示 -->
+      <view class="cache-row" @click="refreshAll">
+        <view class="cache-dot" :class="stats.fromCache ? 'cache-dot-green' : 'cache-dot-amber'"></view>
+        <text class="cache-text">{{ cacheText() }}</text>
+        <text class="cache-refresh">刷新</text>
+      </view>
+    </view>
+
+    <!-- 主内容区 -->
+    <view class="content">
+      <!-- 搜索 -->
+      <view class="search-box">
+        <text class="search-icon">⌕</text>
+        <input
+          class="search-input"
+          v-model="keyword"
+          type="text"
+          placeholder="搜索任务标题"
+          placeholder-class="search-placeholder"
+          confirm-type="search"
+          :adjust-position="true"
+          @confirm="handleSearch"
+        />
+        <text v-if="keyword.length > 0" class="search-clear" @click="clearSearch">×</text>
+      </view>
+
+      <!-- 状态筛选 -->
+      <view class="filter-row">
+        <view class="chip" :class="filter === -1 ? 'chip-active' : ''" @click="selectFilter(-1)">
+          <text class="chip-text">全部</text>
+        </view>
+        <view class="chip" :class="filter === 0 ? 'chip-active' : ''" @click="selectFilter(0)">
+          <text class="chip-text">未完成</text>
+        </view>
+        <view class="chip" :class="filter === 1 ? 'chip-active' : ''" @click="selectFilter(1)">
+          <text class="chip-text">已完成</text>
+        </view>
+        <view class="filter-count">
+          <text class="filter-count-text">共 {{ total }} 条</text>
+        </view>
+      </view>
+
+      <!-- 首次加载 -->
+      <view v-if="loading && tasks.length === 0" class="state-box">
+        <view class="spinner"></view>
+        <text class="state-text">正在加载任务...</text>
+      </view>
+
+      <!-- 空状态 -->
+      <view v-else-if="tasks.length === 0" class="state-box">
+        <text class="empty-mark">✓</text>
+        <text class="state-title">这里很安静</text>
+        <text class="state-text">还没有符合条件的任务，添加一条开始吧</text>
+        <view class="state-button" @click="openCreate">
+          <text class="state-button-text">＋ 新增任务</text>
+        </view>
+      </view>
+
+      <!-- 任务列表 -->
+      <view v-else class="task-list">
+        <view
+          v-for="task in tasks"
+          :key="task.id"
+          class="task-card"
+          :class="task.finished === 1 ? 'task-card-done' : ''"
+        >
+          <view class="task-main">
+            <view
+              class="check-button"
+              :class="task.finished === 1 ? 'check-button-done' : ''"
+              hover-class="check-button-hover"
+              @click="onToggle(task)"
+            >
+              <text v-if="task.finished === 1" class="check-mark">✓</text>
+            </view>
+
+            <view class="task-body">
+              <view class="task-title-row">
+                <text class="task-title" :class="task.finished === 1 ? 'task-title-done' : ''">
+                  {{ task.title }}
+                </text>
+                <view class="priority-pill" :class="priorityClass(task.priority)">
+                  <text class="priority-text">{{ priorityText(task.priority) }}</text>
+                </view>
+              </view>
+
+              <text v-if="task.description.length > 0" class="task-desc">{{ task.description }}</text>
+
+              <view class="task-meta">
+                <text class="meta-item">{{ dueText(task.dueDate) }}</text>
+                <text class="meta-divider">·</text>
+                <text class="meta-item">{{ task.updateTime }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="task-actions">
+            <text class="action-link" @click.stop="editTask(task)">编辑</text>
+            <text class="action-link action-danger" @click.stop="confirmDelete(task)">删除</text>
+          </view>
+        </view>
+
+        <!-- 加载更多：移动端比页码更自然 -->
+        <view v-if="hasMore" class="load-more" @click="loadMore">
+          <text class="load-more-text">{{ loadingMore ? '加载中...' : '加载更多' }}</text>
+        </view>
+        <view v-else class="list-end">
+          <text class="list-end-text">已经到底了</text>
+        </view>
+      </view>
+
+      <view class="footer">
+        <text class="footer-text">uni-app x · Android / iOS / H5</text>
+      </view>
+    </view>
+    </scroll-view>
+
+    <!-- 悬浮新增按钮 -->
+    <view class="fab" hover-class="fab-hover" @click="openCreate">
+      <text class="fab-text">＋</text>
+    </view>
+
+    <!-- 服务器设置弹层 -->
+    <view v-if="showSettings" class="mask" @click="closeSettings">
+      <view class="sheet" @click.stop>
+        <view class="sheet-head">
+          <text class="sheet-title">服务器设置</text>
+          <text class="sheet-close" @click="closeSettings">×</text>
+        </view>
+
+        <text class="sheet-hint">
+          Android 模拟器默认 10.0.2.2；真机请填电脑局域网 IP，例如 http://192.168.1.10:8080/api
+        </text>
+
+        <input
+          class="api-input"
+          v-model="apiInput"
+          type="text"
+          placeholder="http://192.168.1.10:8080/api"
+          placeholder-class="api-placeholder"
+          :adjust-position="true"
+        />
+
+        <text class="sheet-current">当前：{{ currentBase }}</text>
+
+        <view class="sheet-actions">
+          <view class="sheet-button sheet-button-ghost" @click="restoreDefault">
+            <text class="sheet-button-text">恢复默认</text>
+          </view>
+          <view class="sheet-button sheet-button-primary" @click="saveAndTest">
+            <text class="sheet-button-text sheet-button-text-light">
+              {{ testing ? '测试中...' : '保存并测试' }}
+            </text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { Task, TaskStats } from '../../api/models.uts'
+import { pageTasks, getStats, toggleTask, deleteTask } from '../../api/task.uts'
+import {
+  getApiBase,
+  getDefaultApiBase,
+  setApiBase,
+  resetApiBase
+} from '../../api/config.uts'
+
+/* ==================== 页面状态 ==================== */
+
+const statusBarHeight = ref(0)
+const tasks = ref<Task[]>([])
+const stats = ref(new TaskStats())
+const total = ref(0)
+const pageNum = ref(1)
+const pageSize = 10
+const keyword = ref('')
+const filter = ref(-1)
+const loading = ref(false)
+const loadingMore = ref(false)
+const hasMore = ref(false)
+const loadedOnce = ref(false)
+
+const showSettings = ref(false)
+const apiInput = ref('')
+const testing = ref(false)
+const currentBase = ref('')
+
+/**
+ * 注意函数定义顺序：
+ * UTS 编译到 Android 后是 Kotlin 局部函数，
+ * 被调用的函数必须先定义，不能像 JS 那样依赖变量提升。
+ */
+
+/* ==================== 数据加载 ==================== */
+
+/** 统计数字：命中 Redis 时 fromCache=true，并带剩余 TTL */
+async function loadStats() {
+  try {
+    stats.value = await getStats()
+  } catch (e) {
+    // 保持上一次统计值，页面仍可用
+  }
+}
+
+/** 只刷新列表 */
+async function loadList(append: boolean) {
+  if (loading.value) {
+    return
+  }
+  loading.value = true
+  if (append) {
+    loadingMore.value = true
+  }
+
+  try {
+    const data = await pageTasks(pageNum.value, pageSize, keyword.value, filter.value)
+    if (append) {
+      tasks.value = tasks.value.concat(data.records)
+    } else {
+      tasks.value = data.records
+    }
+    total.value = data.total
+    hasMore.value = tasks.value.length < data.total
+  } catch (e) {
+    // 错误提示已由 request.uts 统一弹出
+  } finally {
+    loading.value = false
+    loadingMore.value = false
+  }
+}
+
+/** 同时刷新列表和统计；任何写操作后都调用它 */
+async function loadAll() {
+  await loadStats()
+  await loadList(false)
+  loadedOnce.value = true
+}
+
+/** 刷新按钮 / Redis 状态条 */
+function refreshAll() {
+  pageNum.value = 1
+  loadAll()
+}
+
+/* ==================== 搜索与筛选 ==================== */
+
+function handleSearch() {
+  pageNum.value = 1
+  loadList(false)
+}
+
+function clearSearch() {
+  keyword.value = ''
+  handleSearch()
+}
+
+function selectFilter(value: number) {
+  filter.value = value
+  pageNum.value = 1
+  loadList(false)
+}
+
+/* ==================== 交互动作 ==================== */
+
+function openCreate() {
+  uni.navigateTo({
+    url: '/pages/edit/edit'
+  })
+}
+
+function editTask(task: Task) {
+  uni.navigateTo({
+    url: '/pages/edit/edit?id=' + task.id
+  })
+}
+
+async function onToggle(task: Task) {
+  try {
+    await toggleTask(task.id)
+    uni.showToast({
+      title: task.finished === 1 ? '已恢复为未完成' : '已完成',
+      icon: 'none'
+    })
+    await loadAll()
+  } catch (e) {
+    // 错误提示已统一处理
+  }
+}
+
+async function doDelete(task: Task) {
+  try {
+    await deleteTask(task.id)
+    uni.showToast({
+      title: '已删除',
+      icon: 'none'
+    })
+    if (tasks.value.length === 1 && pageNum.value > 1) {
+      pageNum.value = pageNum.value - 1
+    }
+    await loadAll()
+  } catch (e) {
+    // 错误提示已统一处理
+  }
+}
+
+function confirmDelete(task: Task) {
+  uni.showModal({
+    title: '删除任务',
+    content: '确定要删除「' + task.title + '」吗？',
+    confirmText: '删除',
+    confirmColor: '#f56c6c',
+    cancelText: '取消',
+    success: (res) => {
+      if (res.confirm) {
+        doDelete(task)
+      }
+    }
+  })
+}
+
+function loadMore() {
+  if (!hasMore.value || loadingMore.value) {
+    return
+  }
+  pageNum.value = pageNum.value + 1
+  loadList(true)
+}
+
+/* ==================== 服务器设置 ==================== */
+
+function openSettings() {
+  apiInput.value = getApiBase()
+  currentBase.value = getApiBase()
+  showSettings.value = true
+}
+
+function closeSettings() {
+  showSettings.value = false
+}
+
+function restoreDefault() {
+  resetApiBase()
+  apiInput.value = getDefaultApiBase()
+  currentBase.value = getApiBase()
+  uni.showToast({
+    title: '已恢复默认地址',
+    icon: 'none'
+  })
+}
+
+async function saveAndTest() {
+  const value = apiInput.value.trim()
+  if (value.length === 0) {
+    uni.showToast({
+      title: '请填写服务器地址',
+      icon: 'none'
+    })
+    return
+  }
+
+  testing.value = true
+  setApiBase(value)
+  currentBase.value = getApiBase()
+
+  try {
+    const s = await getStats()
+    showSettings.value = false
+    uni.showToast({
+      title: '连接成功，共 ' + s.total + ' 条任务',
+      icon: 'none'
+    })
+    pageNum.value = 1
+    await loadAll()
+  } catch (e) {
+    // 错误提示由 request.uts 弹出；保留设置，方便用户修改
+  } finally {
+    testing.value = false
+  }
+}
+
+/* ==================== 展示辅助 ==================== */
+
+function cacheText(): string {
+  if (stats.value.fromCache) {
+    return 'Redis 命中 · 剩余 ' + stats.value.ttl + 's'
+  }
+  return 'Redis 回源 · 已写入缓存 60s'
+}
+
+function priorityText(priority: number): string {
+  if (priority === 3) {
+    return '高'
+  }
+  if (priority === 1) {
+    return '低'
+  }
+  return '中'
+}
+
+function priorityClass(priority: number): string {
+  if (priority === 3) {
+    return 'priority-high'
+  }
+  if (priority === 1) {
+    return 'priority-low'
+  }
+  return 'priority-mid'
+}
+
+function dueText(dueDate: string): string {
+  if (dueDate.length === 0) {
+    return '无截止日期'
+  }
+  return '截止 ' + dueDate
+}
+
+/* ==================== 页面生命周期 ==================== */
+
+onLoad(() => {
+  const info = uni.getSystemInfoSync()
+  statusBarHeight.value = info.statusBarHeight
+  loadAll()
+})
+
+// 从编辑页返回时刷新列表和统计
+onShow(() => {
+  if (loadedOnce.value) {
+    loadAll()
+  }
+})
+</script>
+
+<style>
+.page {
+  flex: 1;
+  width: 100%;
+  background-color: #f5f7fa;
+  color: #303133;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-scroll {
+  flex: 1;
+  height: 0;
+}
+
+/* App 端不支持 vh；H5 端保留整屏背景 */
+/* #ifdef H5 */
+.page {
+  min-height: 100vh;
+}
+/* #endif */
+
+/* ---------- 顶部白色页头 ---------- */
+.topbar {
+  background-color: #ffffff;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  padding-bottom: 20rpx;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: #ebeef5;
+}
+
+/* ---------- 浅灰内容区 ---------- */
+.hero {
+  background-color: #f5f7fa;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  padding-bottom: 12rpx;
+}
+
+.hero-top {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.brand-logo {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 18rpx;
+  background-color: #409eff;
+  background-image: linear-gradient(135deg, #409eff 0%, #337ecc 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-logo-text {
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  margin-left: 18rpx;
+}
+
+.brand-name {
+  color: #303133;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.brand-sub {
+  color: #909399;
+  font-size: 17rpx;
+  letter-spacing: 1rpx;
+  margin-top: 4rpx;
+}
+
+.icon-button {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 34rpx;
+  background-color: #f5f7fa;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #ebeef5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-button-hover {
+  background-color: #ecf5ff;
+}
+
+.icon-button-text {
+  color: #606266;
+  font-size: 32rpx;
+}
+
+.hero-title-wrap {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20rpx;
+}
+
+.hero-eyebrow {
+  color: #409eff;
+  font-size: 20rpx;
+  letter-spacing: 3rpx;
+  font-weight: 600;
+}
+
+.hero-title {
+  color: #303133;
+  font-size: 40rpx;
+  line-height: 54rpx;
+  font-weight: 700;
+  margin-top: 8rpx;
+}
+
+.hero-desc {
+  color: #909399;
+  font-size: 22rpx;
+  line-height: 32rpx;
+  margin-top: 8rpx;
+}
+
+/* ---------- 统计卡片：与 Element Plus 卡片一致 ---------- */
+.stats-row {
+  display: flex;
+  flex-direction: row;
+  margin-top: 24rpx;
+}
+
+.stat-card {
+  flex: 1;
+  background-color: #ffffff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #ebeef5;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  margin-right: 12rpx;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
+}
+
+.stat-card:last-child {
+  margin-right: 0;
+}
+
+.stat-label {
+  color: #909399;
+  font-size: 21rpx;
+}
+
+.stat-value {
+  color: #303133;
+  font-size: 40rpx;
+  line-height: 52rpx;
+  font-weight: 700;
+  margin-top: 4rpx;
+}
+
+.stat-amber {
+  color: #e6a23c;
+}
+
+.stat-green {
+  color: #67c23a;
+}
+
+/* ---------- Redis 状态条 ---------- */
+.cache-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 20rpx;
+  padding-top: 16rpx;
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: #ebeef5;
+}
+
+.cache-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 6rpx;
+  margin-right: 12rpx;
+}
+
+.cache-dot-green {
+  background-color: #67c23a;
+}
+
+.cache-dot-amber {
+  background-color: #e6a23c;
+}
+
+.cache-text {
+  color: #606266;
+  font-size: 21rpx;
+  flex: 1;
+}
+
+.cache-refresh {
+  color: #409eff;
+  font-size: 21rpx;
+  font-weight: 600;
+}
+
+/* ---------- 主内容 ---------- */
+.content {
+  padding: 28rpx 32rpx 140rpx 32rpx;
+}
+
+.search-box {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 88rpx;
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdfe6;
+  padding-left: 24rpx;
+  padding-right: 20rpx;
+}
+
+.search-icon {
+  color: #909399;
+  font-size: 34rpx;
+  margin-right: 12rpx;
+}
+
+.search-input {
+  flex: 1;
+  height: 88rpx;
+  color: #303133;
+  font-size: 27rpx;
+}
+
+.search-placeholder {
+  color: #c0c4cc;
+}
+
+.search-clear {
+  color: #c0c4cc;
+  font-size: 38rpx;
+  padding-left: 16rpx;
+  padding-right: 4rpx;
+}
+
+/* ---------- 筛选 ---------- */
+.filter-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 22rpx;
+}
+
+.chip {
+  height: 58rpx;
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+  border-radius: 29rpx;
+  background-color: #ffffff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdfe6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12rpx;
+}
+
+.chip-active {
+  background-color: #409eff;
+  border-color: #409eff;
+}
+
+.chip-text {
+  color: #606266;
+  font-size: 23rpx;
+  font-weight: 500;
+}
+
+.chip-active .chip-text {
+  color: #ffffff;
+}
+
+.filter-count {
+  flex: 1;
+  align-items: flex-end;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.filter-count-text {
+  color: #909399;
+  font-size: 21rpx;
+}
+
+/* ---------- 状态 / 空列表 ---------- */
+.state-box {
+  margin-top: 32rpx;
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #ebeef5;
+  padding: 64rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.spinner {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 20rpx;
+  border-width: 4rpx;
+  border-style: solid;
+  border-color: #e4e7ed;
+  border-top-color: #409eff;
+  margin-bottom: 20rpx;
+}
+
+.empty-mark {
+  width: 92rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  text-align: center;
+  border-radius: 46rpx;
+  background-color: #ecf5ff;
+  color: #409eff;
+  font-size: 40rpx;
+  font-weight: 700;
+  margin-bottom: 20rpx;
+}
+
+.state-title {
+  color: #303133;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.state-text {
+  color: #909399;
+  font-size: 23rpx;
+  line-height: 34rpx;
+  margin-top: 8rpx;
+  text-align: center;
+}
+
+.state-button {
+  margin-top: 24rpx;
+  height: 68rpx;
+  padding-left: 30rpx;
+  padding-right: 30rpx;
+  border-radius: 8rpx;
+  background-color: #409eff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.state-button-text {
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+/* ---------- 任务卡片 ---------- */
+.task-list {
+  margin-top: 24rpx;
+}
+
+.task-card {
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #ebeef5;
+  padding: 24rpx;
+  margin-bottom: 18rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
+}
+
+.task-card-done {
+  background-color: #fafafa;
+}
+
+.task-main {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.check-button {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #dcdfe6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rpx;
+  margin-right: 18rpx;
+}
+
+.check-button-hover {
+  border-color: #409eff;
+}
+
+.check-button-done {
+  background-color: #409eff;
+  border-color: #409eff;
+}
+
+.check-mark {
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.task-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-title-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.task-title {
+  flex: 1;
+  color: #303133;
+  font-size: 29rpx;
+  line-height: 40rpx;
+  font-weight: 600;
+  margin-right: 12rpx;
+}
+
+.task-title-done {
+  color: #a8abb2;
+}
+
+.priority-pill {
+  height: 38rpx;
+  padding-left: 14rpx;
+  padding-right: 14rpx;
+  border-radius: 6rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rpx;
+}
+
+.priority-high {
+  background-color: #fef0f0;
+}
+
+.priority-mid {
+  background-color: #fdf6ec;
+}
+
+.priority-low {
+  background-color: #f4f4f5;
+}
+
+.priority-text {
+  font-size: 19rpx;
+  font-weight: 600;
+}
+
+.priority-high .priority-text {
+  color: #f56c6c;
+}
+
+.priority-mid .priority-text {
+  color: #e6a23c;
+}
+
+.priority-low .priority-text {
+  color: #909399;
+}
+
+.task-desc {
+  color: #909399;
+  font-size: 23rpx;
+  line-height: 34rpx;
+  margin-top: 8rpx;
+}
+
+.task-meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 12rpx;
+}
+
+.meta-item {
+  color: #c0c4cc;
+  font-size: 20rpx;
+}
+
+.meta-divider {
+  color: #dcdfe6;
+  font-size: 20rpx;
+  margin-left: 8rpx;
+  margin-right: 8rpx;
+}
+
+.task-actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-top: 16rpx;
+  padding-top: 14rpx;
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: #f2f6fc;
+}
+
+.action-link {
+  color: #409eff;
+  font-size: 23rpx;
+  font-weight: 500;
+  margin-left: 32rpx;
+}
+
+.action-danger {
+  color: #f56c6c;
+}
+
+/* ---------- 加载更多 ---------- */
+.load-more {
+  height: 78rpx;
+  border-radius: 12rpx;
+  background-color: #ffffff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #ebeef5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4rpx;
+}
+
+.load-more-text {
+  color: #409eff;
+  font-size: 24rpx;
+  font-weight: 500;
+}
+
+.list-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24rpx 0;
+}
+
+.list-end-text {
+  color: #c0c4cc;
+  font-size: 20rpx;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28rpx 0 10rpx 0;
+}
+
+.footer-text {
+  color: #c0c4cc;
+  font-size: 19rpx;
+  letter-spacing: 1rpx;
+}
+
+/* ---------- 悬浮按钮 ---------- */
+.fab {
+  position: fixed;
+  right: 36rpx;
+  bottom: 48rpx;
+  width: 108rpx;
+  height: 108rpx;
+  border-radius: 54rpx;
+  background-color: #409eff;
+  box-shadow: 0 10rpx 24rpx rgba(64, 158, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.fab-hover {
+  background-color: #337ecc;
+}
+
+.fab-text {
+  color: #ffffff;
+  font-size: 48rpx;
+  line-height: 52rpx;
+  margin-top: -4rpx;
+}
+
+/* ---------- 设置弹层 ---------- */
+.mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background-color: rgba(10, 18, 32, 0.55);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  z-index: 50;
+}
+
+.sheet {
+  background-color: #ffffff;
+  border-top-left-radius: 16rpx;
+  border-top-right-radius: 16rpx;
+  padding: 32rpx 32rpx 44rpx 32rpx;
+}
+
+.sheet-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sheet-title {
+  color: #303133;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.sheet-close {
+  color: #909399;
+  font-size: 44rpx;
+  line-height: 44rpx;
+  padding-left: 20rpx;
+}
+
+.sheet-hint {
+  color: #909399;
+  font-size: 22rpx;
+  line-height: 34rpx;
+  margin-top: 16rpx;
+}
+
+.api-input {
+  height: 88rpx;
+  border-radius: 8rpx;
+  background-color: #ffffff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdfe6;
+  padding-left: 20rpx;
+  padding-right: 20rpx;
+  color: #303133;
+  font-size: 24rpx;
+  margin-top: 18rpx;
+}
+
+.api-placeholder {
+  color: #c0c4cc;
+}
+
+.sheet-current {
+  color: #909399;
+  font-size: 20rpx;
+  margin-top: 12rpx;
+}
+
+.sheet-actions {
+  display: flex;
+  flex-direction: row;
+  margin-top: 24rpx;
+}
+
+.sheet-button {
+  flex: 1;
+  height: 84rpx;
+  border-radius: 8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet-button-ghost {
+  background-color: #f5f7fa;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdfe6;
+  margin-right: 16rpx;
+}
+
+.sheet-button-primary {
+  background-color: #409eff;
+}
+
+.sheet-button-text {
+  color: #606266;
+  font-size: 25rpx;
+  font-weight: 600;
+}
+
+.sheet-button-text-light {
+  color: #ffffff;
+}
+
+/* H5 宽屏时收窄，避免内容被拉得过宽 */
+/* #ifdef H5 */
+.page {
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 0 70px rgba(15, 23, 42, 0.06);
+}
+
+.mask {
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet {
+  width: 520px;
+  border-radius: 12px;
+}
+/* #endif */
+</style>

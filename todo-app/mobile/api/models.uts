@@ -1,0 +1,51 @@
+/**
+ * 移动端的数据模型。
+ *
+ * 这里用 class 而不是纯 type：
+ * - H5 / Android 都能 new 出稳定的默认值；
+ * - 后端返回的 JSON 先解析成 UTSJSONObject，再逐字段转成 Task，
+ *   避免 Android 端把 JSON 对象直接当 class 使用导致字段缺失。
+ */
+export class Task {
+  id: number = 0
+  title: string = ''
+  description: string = ''
+  priority: number = 2
+  finished: number = 0
+  dueDate: string = ''
+  createTime: string = ''
+  updateTime: string = ''
+}
+
+export class TaskPage {
+  records: Task[] = []
+  total: number = 0
+  current: number = 1
+  pages: number = 0
+}
+
+export class TaskStats {
+  total: number = 0
+  finished: number = 0
+  unfinished: number = 0
+  fromCache: boolean = false
+  ttl: number = 0
+}
+
+/**
+ * 把后端返回的一条记录转成 Task。
+ *
+ * @param obj 后端 JSON 中的一条任务对象
+ */
+export function taskFromJson(obj: UTSJSONObject): Task {
+  const task = new Task()
+  task.id = obj.getNumber('id') ?? 0
+  task.title = obj.getString('title') ?? ''
+  task.description = obj.getString('description') ?? ''
+  task.priority = obj.getNumber('priority') ?? 2
+  task.finished = obj.getNumber('finished') ?? 0
+  task.dueDate = obj.getString('dueDate') ?? ''
+  task.createTime = obj.getString('createTime') ?? ''
+  task.updateTime = obj.getString('updateTime') ?? ''
+  return task
+}

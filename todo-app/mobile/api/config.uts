@@ -1,0 +1,69 @@
+/**
+ * 后端地址配置。
+ *
+ * 不同平台访问同一个后端的地址不同：
+ *   H5               /api（由 Nginx 反向代理到后端）
+ *   Android 模拟器    http://10.0.2.2:8080/api（10.0.2.2 是宿主机）
+ *   iOS 模拟器        http://127.0.0.1:8080/api
+ *   真机              http://电脑局域网IP:8080/api
+ *
+ * 用户可以在首页“服务器设置”里覆盖，覆盖值保存在本地存储中。
+ */
+const API_BASE_KEY = 'todo_api_base_url'
+
+/** 当前平台建议的默认地址 */
+export function getDefaultApiBase(): string {
+  let base = 'http://localhost:8080/api'
+
+  // #ifdef H5
+  base = '/api'
+  // #endif
+
+  // #ifdef APP-ANDROID
+  base = 'http://10.0.2.2:8080/api'
+  // #endif
+
+  // #ifdef APP-IOS
+  base = 'http://127.0.0.1:8080/api'
+  // #endif
+
+  // #ifdef MP-WEIXIN
+  base = 'https://your-domain.com/api'
+  // #endif
+
+  return base
+}
+
+/** 去掉末尾多余的斜杠，避免拼出 //tasks */
+export function normalizeBase(base: string): string {
+  let value = base.trim()
+  while (value.length > 0 && value.charAt(value.length - 1) == '/') {
+    value = value.substring(0, value.length - 1)
+  }
+  return value
+}
+
+/** 页面和请求层统一从这里取地址 */
+export function getApiBase(): string {
+  const saved = uni.getStorageSync(API_BASE_KEY) as string
+  if (saved != null && saved.length > 0) {
+    return normalizeBase(saved)
+  }
+  return getDefaultApiBase()
+}
+
+/** 保存用户手动填写的地址 */
+export function setApiBase(base: string): void {
+  uni.setStorageSync(API_BASE_KEY, normalizeBase(base))
+}
+
+/** 清除覆盖值，恢复当前平台默认地址 */
+export function resetApiBase(): void {
+  uni.removeStorageSync(API_BASE_KEY)
+}
+
+/** 当前是否使用了手动配置（用于界面提示） */
+export function hasCustomApiBase(): boolean {
+  const saved = uni.getStorageSync(API_BASE_KEY) as string
+  return saved != null && saved.length > 0
+}

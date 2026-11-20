@@ -1,0 +1,85 @@
+import { getApiBase } from './config.uts'
+
+/**
+ * uni.request 的 Promise 封装。
+ *
+ * 后端所有接口都返回 { code, message, data }。
+ * 这里统一做三件事：
+ *   1. 拼上当前平台的 API 地址；
+ *   2. 检查 HTTP 状态码和业务 code；
+ *   3. 失败时用 uni.showToast 给出人话提示，并 reject 给页面。
+ *
+ * 页面只要写 const data = await request('GET', '/tasks')，
+ * 拿到的就已经是 data 字段，不用每次拆三层。
+ */
+export function request(
+  method: RequestMethod,
+  path: string,
+  body: UTSJSONObject | null = null
+): Promise<UTSJSONObject> {
+  return new Promise<UTSJSONObject>((resolve, reject) => {
+    const header = new UTSJSONObject()
+    header.set('Content-Type', 'application/json')
+
+    const options: RequestOptions<UTSJSONObject> = {
+      url: getApiBase() + path,
+      method: method,
+      header: header,
+      data: body,
+      timeout: 12000,
+      dataType: 'json',
+      success: (res: RequestSuccess<UTSJSONObject>) => {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          fail(`HTTP ${res.statusCode}，请检查后端地址`)
+          reject(new Error(`HTTP ${res.statusCode}`))
+          return
+        }
+
+        const payload = res.data
+        if (!(payload instanceof UTSJSONObject)) {
+          fail('后端返回格式不正确')
+          reject(new Error('INVALID_BODY'))
+          return
+        }
+
+        const envelope = payload as UTSJSONObject
+        const code = envelope.getNumber('code') ?? 0
+        const message = envelope.getString('message') ?? '请求失败'
+
+        if (code != 200) {
+          fail(message)
+          reject(new Error(message))
+          return
+        }
+
+        const data = envelope.get('data')
+        if (data == null) {
+          resolve(new UTSJSONObject())
+          return
+        }
+        if (!(data instanceof UTSJSONObject)) {
+          fail('后端 data 字段格式不正确')
+          reject(new Error('INVALID_DATA'))
+          return
+        }
+        resolve(data as UTSJSONObject)
+      },
+      fail: (err: RequestFail) => {
+        const detail = err.errMsg.length > 0 ? err.errMsg : '网络请求失败'
+        fail('网络异常：' + detail)
+        reject(new Error(detail))
+      }
+    }
+
+    uni.request<UTSJSONObject>(options)
+  })
+}
+
+/** 统一错误提示，避免每个页面写一遍 */
+function fail(message: string): void {
+  uni.showToast({
+    title: message,
+    icon: 'none',
+    duration: 2600
+  })
+}

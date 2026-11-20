@@ -1,0 +1,10 @@
+<script setup>
+onLaunch(() => {
+  console.log('待办清单启动')
+})
+</script>
+
+<!--
+  全局背景色在 pages.json 的 globalStyle.backgroundColor 中配置。
+  uvue 的 App 端只支持 class 选择器，不能在这里写 page / view / text 标签选择器。
+-->

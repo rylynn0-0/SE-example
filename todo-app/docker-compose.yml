@@ -35,7 +35,10 @@ services:
       # 不设置时 LANG 为空，客户端默认 latin1，执行 init.sql 会把中文写成乱码。
       LANG: C.UTF-8
     ports:
-      - "3306:3306"                     # 宿主机可以用 Navicat 等工具直连
+      # 宿主机端口可用 MYSQL_HOST_PORT 覆盖，默认 3306。
+      # 本机 3306 被别的 MySQL 服务占用时（Windows 上很常见），
+      # 在 todo-app/.env 里写 MYSQL_HOST_PORT=13306 即可，不用改本文件。
+      - "${MYSQL_HOST_PORT:-3306}:3306"  # 宿主机可以用 Navicat 等工具直连
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_general_ci

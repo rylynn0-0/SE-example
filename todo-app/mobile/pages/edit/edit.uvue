@@ -1,0 +1,661 @@
+<template>
+  <view class="page">
+    <!-- 自定义导航栏 -->
+    <view class="nav" :style="{ paddingTop: statusBarHeight + 10 + 'px' }">
+      <view class="nav-back" hover-class="nav-back-hover" @click="goBack">
+        <text class="nav-back-text">‹</text>
+      </view>
+      <text class="nav-title">{{ isEdit ? '编辑任务' : '新增任务' }}</text>
+      <view class="nav-placeholder"></view>
+    </view>
+
+    <view v-if="loading" class="loading-box">
+      <view class="spinner"></view>
+      <text class="loading-text">正在读取任务...</text>
+    </view>
+
+    <scroll-view v-else class="form-scroll" :scroll-y="true">
+      <view class="form-body">
+        <view class="form-hero">
+          <text class="form-eyebrow">任务信息</text>
+          <text class="form-title">{{ isEdit ? '编辑任务' : '新增任务' }}</text>
+          <text class="form-sub">保存后会同步到后端，并让统计缓存失效</text>
+        </view>
+
+        <!-- 标题 -->
+        <view class="field">
+          <view class="field-head">
+            <text class="field-label">任务标题</text>
+            <text class="field-required">必填</text>
+          </view>
+          <input
+            class="text-input"
+            v-model="title"
+            type="text"
+            :maxlength="100"
+            placeholder="例如：完成软工课程设计开题报告"
+            placeholder-class="input-placeholder"
+            :adjust-position="true"
+          />
+          <text class="char-count">{{ title.length }} / 100</text>
+        </view>
+
+        <!-- 优先级 -->
+        <view class="field">
+          <text class="field-label">优先级</text>
+          <view class="priority-row">
+            <view class="priority-option" :class="priority === 1 ? 'priority-option-low' : ''" @click="setPriority(1)">
+              <text class="priority-option-text" :class="priority === 1 ? 'priority-text-low' : ''">低</text>
+              <text class="priority-option-desc">可以稍后</text>
+            </view>
+            <view class="priority-option" :class="priority === 2 ? 'priority-option-mid' : ''" @click="setPriority(2)">
+              <text class="priority-option-text" :class="priority === 2 ? 'priority-text-mid' : ''">中</text>
+              <text class="priority-option-desc">正常推进</text>
+            </view>
+            <view class="priority-option" :class="priority === 3 ? 'priority-option-high' : ''" @click="setPriority(3)">
+              <text class="priority-option-text" :class="priority === 3 ? 'priority-text-high' : ''">高</text>
+              <text class="priority-option-desc">优先处理</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 截止日期 -->
+        <view class="field">
+          <view class="field-head">
+            <text class="field-label">截止日期</text>
+            <text v-if="dueDate.length > 0" class="field-clear" @click="clearDueDate">清除</text>
+          </view>
+          <picker mode="date" :value="pickerDate()" @change="onDateChange">
+            <view class="picker-box">
+              <text class="picker-icon">◷</text>
+              <text class="picker-value" :class="dueDate.length === 0 ? 'picker-placeholder' : ''">
+                {{ dueDate.length > 0 ? dueDate : '选择日期（可选）' }}
+              </text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
+        </view>
+
+        <!-- 备注 -->
+        <view class="field">
+          <text class="field-label">备注</text>
+          <textarea
+            class="textarea"
+            v-model="description"
+            :maxlength="500"
+            placeholder="补充说明、验收标准或注意事项（可选）"
+            placeholder-class="input-placeholder"
+            :adjust-position="true"
+          />
+          <text class="char-count">{{ description.length }} / 500</text>
+        </view>
+
+        <view class="tip-card">
+          <text class="tip-title">数据流</text>
+          <text class="tip-text">页面 → api/task.uts → uni.request → Spring Boot → MySQL / Redis</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="bottom-bar">
+      <view class="cancel-button" hover-class="cancel-button-hover" @click="goBack">
+        <text class="cancel-button-text">取消</text>
+      </view>
+      <view class="save-button" hover-class="save-button-hover" @click="handleSave">
+        <text class="save-button-text">{{ saving ? '保存中...' : '保存任务' }}</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { getTask, createTask, updateTask } from '../../api/task.uts'
+
+const statusBarHeight = ref(0)
+const taskId = ref(0)
+const isEdit = ref(false)
+const loading = ref(false)
+const saving = ref(false)
+
+const title = ref('')
+const description = ref('')
+const priority = ref(2)
+const dueDate = ref('')
+
+/**
+ * 注意函数定义顺序：
+ * UTS 编译到 Android 后是 Kotlin 局部函数，
+ * 被调用的函数必须先定义，不能像 JS 那样依赖变量提升。
+ */
+
+function goBack() {
+  uni.navigateBack({
+    fail: () => {
+      uni.reLaunch({
+        url: '/pages/index/index'
+      })
+    }
+  })
+}
+
+async function loadTask(id: number) {
+  loading.value = true
+  try {
+    const task = await getTask(id)
+    title.value = task.title
+    description.value = task.description
+    priority.value = task.priority
+    dueDate.value = task.dueDate
+  } catch (e) {
+    uni.showToast({
+      title: '任务不存在或已删除',
+      icon: 'none'
+    })
+    setTimeout(() => {
+      goBack()
+    }, 600)
+  } finally {
+    loading.value = false
+  }
+}
+
+function setPriority(value: number) {
+  priority.value = value
+}
+
+function today(): string {
+  const d = new Date()
+  const year = d.getFullYear().toString()
+  let month = (d.getMonth() + 1).toString()
+  let day = d.getDate().toString()
+  if (month.length < 2) {
+    month = '0' + month
+  }
+  if (day.length < 2) {
+    day = '0' + day
+  }
+  return year + '-' + month + '-' + day
+}
+
+function pickerDate(): string {
+  if (dueDate.value.length > 0) {
+    return dueDate.value
+  }
+  return today()
+}
+
+function onDateChange(event: UniPickerChangeEvent) {
+  dueDate.value = event.detail.value as string
+}
+
+function clearDueDate() {
+  dueDate.value = ''
+}
+
+function validate(): boolean {
+  if (title.value.trim().length === 0) {
+    uni.showToast({
+      title: '请输入任务标题',
+      icon: 'none'
+    })
+    return false
+  }
+  if (title.value.length > 100) {
+    uni.showToast({
+      title: '标题不能超过 100 个字符',
+      icon: 'none'
+    })
+    return false
+  }
+  return true
+}
+
+async function handleSave() {
+  if (saving.value || !validate()) {
+    return
+  }
+
+  saving.value = true
+  try {
+    if (isEdit.value) {
+      await updateTask(taskId.value, title.value.trim(), description.value.trim(), priority.value, dueDate.value)
+      uni.showToast({
+        title: '修改成功',
+        icon: 'success'
+      })
+    } else {
+      await createTask(title.value.trim(), description.value.trim(), priority.value, dueDate.value)
+      uni.showToast({
+        title: '新增成功',
+        icon: 'success'
+      })
+    }
+    setTimeout(() => {
+      goBack()
+    }, 500)
+  } catch (e) {
+    // 错误提示由 request.uts 统一处理
+  } finally {
+    saving.value = false
+  }
+}
+
+onLoad((options: OnLoadOptions) => {
+  const info = uni.getSystemInfoSync()
+  statusBarHeight.value = info.statusBarHeight
+
+  const rawId = options['id']
+  if (rawId != null) {
+    const parsed = parseInt(rawId as string)
+    if (parsed > 0) {
+      taskId.value = parsed
+      isEdit.value = true
+      loadTask(parsed)
+    }
+  }
+})
+</script>
+
+<style>
+.page {
+  flex: 1;
+  height: 0;
+  background-color: #f5f7fa;
+  color: #303133;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* App 端不支持 vh；H5 端保留整屏背景 */
+/* #ifdef H5 */
+.page {
+  min-height: 100vh;
+}
+/* #endif */
+
+/* ---------- 导航栏 ---------- */
+.nav {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #ffffff;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: #ebeef5;
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+  padding-bottom: 18rpx;
+}
+
+.nav-back {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 34rpx;
+  background-color: #f5f7fa;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #ebeef5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-back-hover {
+  background-color: #ecf5ff;
+}
+
+.nav-back-text {
+  color: #303133;
+  font-size: 48rpx;
+  line-height: 52rpx;
+  margin-top: -8rpx;
+}
+
+.nav-title {
+  color: #303133;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.nav-placeholder {
+  width: 68rpx;
+  height: 68rpx;
+}
+
+/* ---------- 表单 ---------- */
+.form-scroll {
+  flex: 1;
+  height: 0;
+}
+
+.form-body {
+  padding: 28rpx 32rpx 180rpx 32rpx;
+}
+
+.form-hero {
+  background-color: #ffffff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #ebeef5;
+  border-radius: 12rpx;
+  padding: 28rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-eyebrow {
+  color: #409eff;
+  font-size: 19rpx;
+  letter-spacing: 3rpx;
+  font-weight: 600;
+}
+
+.form-title {
+  color: #303133;
+  font-size: 36rpx;
+  line-height: 50rpx;
+  font-weight: 700;
+  margin-top: 8rpx;
+}
+
+.form-sub {
+  color: #909399;
+  font-size: 21rpx;
+  line-height: 30rpx;
+  margin-top: 8rpx;
+}
+
+.field {
+  margin-top: 24rpx;
+  background-color: #ffffff;
+  border-radius: 12rpx;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #ebeef5;
+  padding: 24rpx;
+}
+
+.field-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field-label {
+  color: #303133;
+  font-size: 25rpx;
+  font-weight: 600;
+}
+
+.field-required {
+  color: #f56c6c;
+  font-size: 19rpx;
+}
+
+.field-clear {
+  color: #409eff;
+  font-size: 21rpx;
+}
+
+.text-input {
+  height: 84rpx;
+  color: #303133;
+  font-size: 27rpx;
+  margin-top: 10rpx;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: #ebeef5;
+}
+
+.input-placeholder {
+  color: #c0c4cc;
+}
+
+.char-count {
+  color: #c0c4cc;
+  font-size: 19rpx;
+  text-align: right;
+  margin-top: 8rpx;
+}
+
+/* ---------- 优先级 ---------- */
+.priority-row {
+  display: flex;
+  flex-direction: row;
+  margin-top: 16rpx;
+}
+
+.priority-option {
+  flex: 1;
+  border-radius: 8rpx;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdfe6;
+  background-color: #ffffff;
+  padding: 16rpx;
+  margin-right: 12rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.priority-option:last-child {
+  margin-right: 0;
+}
+
+.priority-option-low {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+}
+
+.priority-option-mid {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+}
+
+.priority-option-high {
+  border-color: #409eff;
+  background-color: #ecf5ff;
+}
+
+.priority-option-text {
+  color: #606266;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.priority-text-low {
+  color: #409eff;
+}
+
+.priority-text-mid {
+  color: #409eff;
+}
+
+.priority-text-high {
+  color: #409eff;
+}
+
+.priority-option-desc {
+  color: #909399;
+  font-size: 18rpx;
+  margin-top: 4rpx;
+}
+
+/* ---------- 日期 ---------- */
+.picker-box {
+  height: 84rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 8rpx;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: #ebeef5;
+}
+
+.picker-icon {
+  color: #409eff;
+  font-size: 30rpx;
+  margin-right: 14rpx;
+}
+
+.picker-value {
+  flex: 1;
+  color: #303133;
+  font-size: 26rpx;
+}
+
+.picker-placeholder {
+  color: #c0c4cc;
+}
+
+.picker-arrow {
+  color: #c0c4cc;
+  font-size: 38rpx;
+}
+
+/* ---------- 备注 ---------- */
+.textarea {
+  width: 100%;
+  height: 180rpx;
+  color: #303133;
+  font-size: 25rpx;
+  line-height: 38rpx;
+  margin-top: 14rpx;
+  padding: 16rpx;
+  background-color: #f5f7fa;
+  border-radius: 8rpx;
+}
+
+/* ---------- 提示 ---------- */
+.tip-card {
+  margin-top: 24rpx;
+  background-color: #ecf5ff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #d9ecff;
+  border-radius: 8rpx;
+  padding: 20rpx 22rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.tip-title {
+  color: #409eff;
+  font-size: 21rpx;
+  font-weight: 600;
+}
+
+.tip-text {
+  color: #606266;
+  font-size: 20rpx;
+  line-height: 30rpx;
+  margin-top: 4rpx;
+}
+
+/* ---------- 底部按钮 ---------- */
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ffffff;
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: #ebeef5;
+  padding: 18rpx 32rpx 36rpx 32rpx;
+  display: flex;
+  flex-direction: row;
+  z-index: 10;
+}
+
+.cancel-button {
+  width: 180rpx;
+  height: 86rpx;
+  border-radius: 8rpx;
+  background-color: #ffffff;
+  border-width: 1px;
+  border-style: solid;
+  border-color: #dcdfe6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16rpx;
+}
+
+.cancel-button-hover {
+  background-color: #ecf5ff;
+}
+
+.cancel-button-text {
+  color: #606266;
+  font-size: 25rpx;
+  font-weight: 600;
+}
+
+.save-button {
+  flex: 1;
+  height: 86rpx;
+  border-radius: 8rpx;
+  background-color: #409eff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.save-button-hover {
+  background-color: #337ecc;
+}
+
+.save-button-text {
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+/* ---------- 加载 ---------- */
+.loading-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  border-width: 4rpx;
+  border-style: solid;
+  border-color: #ebeef5;
+  border-top-color: #409eff;
+  margin-bottom: 18rpx;
+}
+
+.loading-text {
+  color: #909399;
+  font-size: 23rpx;
+}
+
+/* H5 宽屏适配 */
+/* #ifdef H5 */
+.page {
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 0 70px rgba(15, 23, 42, 0.06);
+  min-height: 100vh;
+}
+
+.bottom-bar {
+  max-width: 1000px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+/* #endif */
+</style>

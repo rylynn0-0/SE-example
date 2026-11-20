@@ -1,0 +1,124 @@
+import { request } from './request.uts'
+import { Task, TaskPage, TaskStats, taskFromJson } from './models.uts'
+
+/**
+ * 分页查询任务。
+ *
+ * @param pageNum  页码，从 1 开始
+ * @param pageSize 每页条数
+ * @param keyword  标题关键词，空字符串表示不筛选
+ * @param finished -1=全部，0=未完成，1=已完成
+ */
+export function pageTasks(
+  pageNum: number,
+  pageSize: number,
+  keyword: string,
+  finished: number
+): Promise<TaskPage> {
+  let path = `/tasks?pageNum=${pageNum}&pageSize=${pageSize}`
+  if (keyword.length > 0) {
+    path += '&keyword=' + encodeURIComponent(keyword)
+  }
+  if (finished >= 0) {
+    path += '&finished=' + finished
+  }
+
+  return request('GET', path).then((data: UTSJSONObject): TaskPage => {
+    const page = new TaskPage()
+    page.total = data.getNumber('total') ?? 0
+    page.current = data.getNumber('current') ?? 1
+    page.pages = data.getNumber('pages') ?? 0
+
+    const records = data.getArray('records')
+    if (records != null) {
+      const list: Task[] = []
+      for (let i = 0; i < records.length; i++) {
+        const item = records[i]
+        if (item instanceof UTSJSONObject) {
+          list.push(taskFromJson(item))
+        }
+      }
+      page.records = list
+    }
+    return page
+  })
+}
+
+/** 按 ID 查询一条任务，编辑页使用 */
+export function getTask(id: number): Promise<Task> {
+  return request('GET', `/tasks/${id}`).then((data: UTSJSONObject): Task => {
+    return taskFromJson(data)
+  })
+}
+
+/** 新增任务 */
+export function createTask(
+  title: string,
+  description: string,
+  priority: number,
+  dueDate: string
+): Promise<Task> {
+  const body = buildTaskBody(title, description, priority, dueDate)
+  return request('POST', '/tasks', body).then((data: UTSJSONObject): Task => {
+    return taskFromJson(data)
+  })
+}
+
+/** 更新任务 */
+export function updateTask(
+  id: number,
+  title: string,
+  description: string,
+  priority: number,
+  dueDate: string
+): Promise<Task> {
+  const body = buildTaskBody(title, description, priority, dueDate)
+  return request('PUT', `/tasks/${id}`, body).then((data: UTSJSONObject): Task => {
+    return taskFromJson(data)
+  })
+}
+
+/** 切换完成状态 */
+export function toggleTask(id: number): Promise<Task> {
+  return request('PATCH', `/tasks/${id}/finished`).then((data: UTSJSONObject): Task => {
+    return taskFromJson(data)
+  })
+}
+
+/** 逻辑删除 */
+export function deleteTask(id: number): Promise<void> {
+  return request('DELETE', `/tasks/${id}`).then((): void => {})
+}
+
+/** 统计信息，同时用于观察 Redis 命中情况 */
+export function getStats(): Promise<TaskStats> {
+  return request('GET', '/tasks/stats').then((data: UTSJSONObject): TaskStats => {
+    const stats = new TaskStats()
+    stats.total = data.getNumber('total') ?? 0
+    stats.finished = data.getNumber('finished') ?? 0
+    stats.unfinished = data.getNumber('unfinished') ?? 0
+    stats.fromCache = data.getBoolean('fromCache') ?? false
+    stats.ttl = data.getNumber('ttl') ?? 0
+    return stats
+  })
+}
+
+/**
+ * 构造请求体。
+ *
+ * 后端用 LocalDate 接收 dueDate，空值要显式传 null，
+ * 表示“不设置截止日期”；传空字符串会在部分 Jackson 配置下解析失败。
+ */
+function buildTaskBody(
+  title: string,
+  description: string,
+  priority: number,
+  dueDate: string
+): UTSJSONObject {
+  const body = new UTSJSONObject()
+  body.set('title', title)
+  body.set('description', description)
+  body.set('priority', priority)
+  body.set('dueDate', dueDate.length > 0 ? dueDate : null)
+  return body
+}

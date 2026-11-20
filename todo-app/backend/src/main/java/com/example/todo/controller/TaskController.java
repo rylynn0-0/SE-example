@@ -72,6 +72,26 @@ public class TaskController {
     }
 
     /**
+     * 按 ID 查询单条任务。
+     *
+     * <p>移动端编辑页需要先加载任务原数据。分页接口虽然也能查到，
+     * 但按 ID 查询语义更直接，也方便以后做任务详情页或分享链接。
+     *
+     * @param id 任务主键
+     * @return 任务详情；不存在时返回 404
+     */
+    @GetMapping("/{id}")
+    @Operation(summary = "查询单条任务", description = "按 ID 查询任务详情，供移动端编辑页回填表单")
+    public Result<Task> getById(
+            @Parameter(description = "任务 ID", example = "1") @PathVariable Long id) {
+        Task task = taskService.getById(id);
+        if (task == null) {
+            return Result.fail(404, "任务不存在");
+        }
+        return Result.ok(task);
+    }
+
+    /**
      * 查询任务统计信息。
      *
      * <p>这个接口是演示 Redis 缓存的窗口：

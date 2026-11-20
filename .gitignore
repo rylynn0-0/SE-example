@@ -78,3 +78,11 @@ coverage/
 # ---------- 本地工具产物 ----------
 # 研究/笔记工具（如 Mimir）自动导出的备份，只属于本机工作区，与示例代码无关
 .research/
+
+# HBuilderX / 编译验证时的本地工具与缓存
+.tools/
+.npm-cache/
+.scratch/
+unpackage/
+*.tgz
+compile-h5.log

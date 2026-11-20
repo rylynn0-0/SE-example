@@ -19,9 +19,10 @@ SE-example/
 │   ├── docs/
 │   │   ├── 技术栈代码对照.md        # 每项技术 → 对应代码位置
 │   │   ├── API接口文档.md           # 接口清单、参数、返回示例、错误码
-│   │   └── tutorials/              # 分层教程：00 总览 + 六章
+│   │   └── tutorials/              # 18 篇：总览 + 分层 + 模板 + 增删改查 + 移动端 + 环境
 │   ├── backend/                    # Spring Boot 3 + MyBatis-Plus（JDK 17）
-│   └── frontend/                   # Vue 3 + Element Plus + Vite
+│   ├── frontend/                   # Vue 3 + Element Plus + Vite
+│   └── mobile/                     # uni-app x：Android / iOS / H5
 ├── .dns-test/                      # 容器 DNS 排查用的最小镜像（可选工具）
 └── .research/                      # 本地研究记录备份（与示例代码无关）
 ```
@@ -79,9 +80,11 @@ docker compose down -v   # 停止并删数据卷（init.sql 会重新执行）
 | 某段代码对应哪项技术 | [docs/技术栈代码对照.md](todo-app/docs/技术栈代码对照.md) |
 | 每个接口的参数与返回结构 | [docs/API接口文档.md](todo-app/docs/API接口文档.md) |
 | 系统入门（建议从这章开始） | [docs/tutorials/00-开始这里.md](todo-app/docs/tutorials/00-开始这里.md) |
+| 在 Windows 上装 Docker、改端口 / 密码 / 时区 | [17 Windows 装 Docker 与配置速查](todo-app/docs/tutorials/17-Windows装Docker与配置速查.md) |
+| 迁移到 Android / 手机端 | [15 移动端](todo-app/docs/tutorials/15-移动端.md) → [16 Android 云打包](todo-app/docs/tutorials/16-Android云打包.md) |
 | 常见报错与排查（白屏、连不上库、表不存在等） | [todo-app/README.md 第八节](todo-app/README.md#八常见问题) |
 
-教程共 7 篇：`00` 总览、`01` 前端、`02` 后端、`03` 数据库、`04` 前后端耦合、`05` 后端与数据库耦合、`06` 必要技术（Knife4j / Nginx / Docker）。
+教程共 18 篇：`00` 总览、`01` 前端、`02` 后端、`03` 数据库、`04` 前后端耦合、`05` 后端与数据库耦合、`06` 前端模板、`07` 后端模板、`08` 数据库模板、`09` 必要技术、`10`–`14` 增删改查链路、`15` 移动端、`16` Android 云打包、`17` Windows 装 Docker 与配置速查。
 
 ---
 
@@ -92,7 +95,11 @@ docker compose down -v   # 停止并删数据卷（init.sql 会重新执行）
 | JDK | 17+ | 后端编译运行（Spring Boot 3.x 要求） |
 | Maven | 3.9+ | 后端依赖与打包 |
 | Node.js | 18+ | 前端构建 |
+| HBuilderX | 5.34+ | uni-app x 移动端运行与云打包（仅手机端需要） |
 | Docker + Compose | 24+ | 四容器一键启动 |
+
+> Windows 上还没装 Docker？先按 **[17 Windows 装 Docker 与配置速查](todo-app/docs/tutorials/17-Windows装Docker与配置速查.md)**
+> 装 WSL2 + Docker Desktop，再用四条命令验证引擎可用。
 
 后端已在 [backend/settings.xml](todo-app/backend/settings.xml) 内置阿里云 Maven 镜像，Docker 构建时通过 `mvn -s settings.xml` 生效。
 

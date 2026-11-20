@@ -21,6 +21,7 @@
 | **Vite** | 开发服务器、热更新、生产构建、接口代理 | `frontend/vite.config.js`、`frontend/package.json` |
 | **Vue Router** | 路由与页面切换 | `frontend/src/router/index.js` |
 | **Axios** | HTTP 请求、统一响应处理、错误提示 | `frontend/src/api/request.js`、`frontend/src/api/task.js` |
+| **uni-app x** | Android / iOS / H5 跨平台客户端 | `mobile/pages/`、`mobile/api/`、`mobile/manifest.json` |
 | **Spring Boot** | Web 容器、依赖注入、配置管理、REST 接口 | `backend/src/main/java/com/example/todo/TodoApplication.java`、`controller/` |
 | **MyBatis-Plus** | ORM、免写 SQL 的 CRUD、分页、逻辑删除 | `entity/Task.java`、`mapper/TaskMapper.java`、`service/impl/TaskServiceImpl.java`、`config/MybatisPlusConfig.java` |
 | **Knife4j** | 根据注解生成在线接口文档 | `config/Knife4jConfig.java` + 各 Controller 上的 `@Tag/@Operation` |
@@ -30,8 +31,9 @@
 
 > 想按「技术 → 代码片段」逐条对照阅读，请看 **[docs/技术栈代码对照.md](docs/技术栈代码对照.md)**。
 > 想查每个接口的请求参数和返回结构，请看 **[docs/API接口文档.md](docs/API接口文档.md)**。
-> 想按「定位 → 耦合 → 操作」的路径入门，请看 **[docs/tutorials/00-开始这里.md](docs/tutorials/00-开始这里.md)**。共 15 篇：总览 + 定位（01–03）+ 耦合（04–05）+ 模板（[06 前端](docs/tutorials/06-前端模板.md)、[07 后端](docs/tutorials/07-后端模板.md)、[08 数据库](docs/tutorials/08-数据库模板.md)）+ [09 部署运行](docs/tutorials/09-必要技术.md) + 增删改查专题（[10 总览](docs/tutorials/10-增删改查总览.md)、[11 查](docs/tutorials/11-查询链路.md)、[12 增](docs/tutorials/12-新增链路.md)、[13 改](docs/tutorials/13-修改链路.md)、[14 删](docs/tutorials/14-删除链路.md)），模板与语法写在一起。
+> 想按「定位 → 耦合 → 操作」的路径入门，请看 **[docs/tutorials/00-开始这里.md](docs/tutorials/00-开始这里.md)**。共 18 篇：总览 + 定位（01–03）+ 耦合（04–05）+ 模板（[06 前端](docs/tutorials/06-前端模板.md)、[07 后端](docs/tutorials/07-后端模板.md)、[08 数据库](docs/tutorials/08-数据库模板.md)）+ [09 部署运行](docs/tutorials/09-必要技术.md) + 增删改查专题（[10 总览](docs/tutorials/10-增删改查总览.md)、[11 查](docs/tutorials/11-查询链路.md)、[12 增](docs/tutorials/12-新增链路.md)、[13 改](docs/tutorials/13-修改链路.md)、[14 删](docs/tutorials/14-删除链路.md)）+ 移动端（[15 移动端](docs/tutorials/15-移动端.md)、[16 Android 云打包](docs/tutorials/16-Android云打包.md)）+ 环境（[17 Windows 装 Docker 与配置速查](docs/tutorials/17-Windows装Docker与配置速查.md)），模板与语法写在一起。
 > 想按「用户点击 → 转发后端 → 操作数据库 → 回显前端」走完增删改查四条链路，先看 **[10 总览](docs/tutorials/10-增删改查总览.md)**，再按需读 [11 查](docs/tutorials/11-查询链路.md) / [12 增](docs/tutorials/12-新增链路.md) / [13 改](docs/tutorials/13-修改链路.md) / [14 删](docs/tutorials/14-删除链路.md)。
+> 想把项目装到 Android 手机：先看 **[15 移动端](docs/tutorials/15-移动端.md)** 了解结构，再按 **[16 Android 云打包](docs/tutorials/16-Android云打包.md)** 操作。
 
 ---
 
@@ -108,7 +110,18 @@ todo-app/
 │       ├── 11-查询链路.md           # 查询/搜索/分页 → SQL → 表格回显
 │       ├── 12-新增链路.md           # 弹窗/表单 → INSERT → 新行出现
 │       ├── 13-修改链路.md           # 编辑 PUT + 状态开关 PATCH
-│       └── 14-删除链路.md           # 确认框 → 逻辑删除 → 行消失
+│       ├── 14-删除链路.md           # 确认框 → 逻辑删除 → 行消失
+│       ├── 15-移动端.md             # uni-app x 迁移、页面、请求层、跨平台地址
+│       ├── 16-Android云打包.md      # HBuilderX 登录、AppID、云端证书、APK
+│       └── 17-Windows装Docker与配置速查.md  # WSL2 + Docker Desktop 安装、配置项改哪里
+├── mobile/                         # uni-app x 跨平台客户端
+│   ├── pages/index/index.uvue      # 首页：统计 / 搜索 / 筛选 / 列表 / 设置
+│   ├── pages/edit/edit.uvue        # 新增 / 编辑
+│   ├── api/                        # config / request / task / models
+│   ├── static/                     # 图标
+│   ├── manifest.json               # AppID、包名、版本、图标
+│   ├── AndroidManifest.xml         # Android 网络权限、明文 HTTP
+│   └── docs/Android云打包教程.md    # 移动端目录内的操作副本
 ├── backend/                        # Spring Boot 后端
 │   ├── pom.xml                     # 依赖：web / mybatis-plus / mysql / redis / knife4j / lombok
 │   ├── settings.xml                # Maven 阿里云镜像（只在 Docker 构建时用 -s 指定）
@@ -288,13 +301,16 @@ Redis 在整个项目里只有**一个落点**，就是统计接口，刻意做�
 - **配置外置**：数据库地址、密码全部通过 `environment` 注入，**不改一行代码**就能换环境。
 - **端口映射**：`8081→80`（前端）、`8080→8080`（后端，直接访问 doc.html）、`3306`、`6379`（方便用客户端工具连）。
 
+> Windows 上怎么装 Docker、装完怎么验证、这四份文件各改哪一处，见
+> **[17 Windows 装 Docker 与配置速查](docs/tutorials/17-Windows装Docker与配置速查.md)**。
+
 ---
 
 ## 五、快速开始
 
 ### 方式一：Docker 一键启动（推荐）
 
-前置要求：已安装 Docker 与 Docker Compose。
+前置要求：已安装 Docker 与 Docker Compose（Windows 上还没装过，先按 [17 Windows 装 Docker](docs/tutorials/17-Windows装Docker与配置速查.md) 装一遍）。
 
 ```bash
 cd todo-app
@@ -445,6 +461,25 @@ docker compose logs mysql | grep -iE "running /docker-entrypoint-initdb.d|init p
 ```
 
 成功时会看到 `running /docker-entrypoint-initdb.d/init.sql` 紧跟着 `MySQL init process done.`，且**没有** `Permission denied`。
+
+**Q10：`docker compose up` 报 `ports are not available: exposing port TCP 0.0.0.0:3306`？**
+
+本机已经有一个 MySQL 服务占着 3306（Windows 上通常随开机自启，服务名多为 `MySQL80` / `MySQL96`）。
+随后 redis 会被连带取消，backend / frontend 停在 `not started`，所以看起来像「四个容器全挂了」，实际只有端口这一个原因。
+
+两种解法：
+
+1. **不用本机 MySQL**：`services.msc` → 该 MySQL 服务 → 停止，并把启动类型改成「手动」。
+2. **两个都要**：保留本机 MySQL，让容器换宿主机端口 —— 在 `todo-app/.env` 里写一行：
+
+   ```ini
+   MYSQL_HOST_PORT=13306
+   ```
+
+   compose 里已写成 `${MYSQL_HOST_PORT:-3306}:3306`，不写这一行就是默认 3306。
+   该文件被 `.gitignore` 忽略，不影响别人克隆后的默认配置。之后 Navicat 连 `localhost:13306`。
+
+用 `docker compose config` 可确认最终端口（看 `published`）。同样的办法适用于 6379 / 8080 / 8081 冲突。
 
 ---
 
